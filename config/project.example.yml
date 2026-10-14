@@ -1,0 +1,42 @@
+# Config dự án cho ama-kit. KHÔNG chứa token (token ở biến môi trường hoặc keychain).
+# Chép thành .ama/project.yml trong project của bạn (hoặc config/project.yml khi chạy từ repo kit),
+# hoặc chạy "workflow init".
+
+project:
+  key: PROJ                      # key dự án Jira
+
+jira:
+  site: your-site.atlassian.net  # có thể bỏ trống và dùng biến ATLASSIAN_SITE
+  acceptanceCriteriaField: null  # vd. customfield_10050; null = tự dò theo tên field
+
+confluence:
+  site: your-site.atlassian.net
+  spaceKey: ENG
+
+figma:
+  fileKey: ""                    # phần sau /design/ trong URL Figma
+  frames:                        # frame luôn tải khi phân tích
+    - nodeId: "12:34"
+      name: Login
+    - nodeId: "56:78"
+      name: Home
+
+mobile:
+  platform: android              # bản này chỉ hỗ trợ android
+  cloud: browserstack
+  appPath: ./app/build/app-debug.apk   # file .apk local, hoặc bs://... đã upload
+  device:
+    name: Google Pixel 8
+    platformVersion: "14.0"
+  wdioConfig: ""                 # tùy chọn: wdio.conf.js để chạy suite khác ngoài smoke
+
+runsDir: runs                    # nơi tạo runs/<KEY>-<thời điểm>/
+
+dataBoundary:
+  maxSourceChars: 120000         # mỗi file nguồn; dài hơn thì cắt và ghi chú
+  extraRedact: []                # luôn che token, email, số tài khoản; thêm "phones" nếu cần
+
+limits:
+  maxPages: 10
+  maxFrames: 20
+  maxRelatedIssues: 25

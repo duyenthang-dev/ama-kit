@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+# config thật của dự án (mẫu: config/project.example.yml)
+config/project.yml
+.ama/
+# danh sách chuỗi cấm, chỉ để trên máy (xem scripts/validate-governance.js)
+config/banned-terms.txt
+# dữ liệu run: chứa nội dung requirement
+runs/
+mobile-results/
+# file sinh bởi adapter
+.cursor/
+.cursor-generated/
+generated/
+.DS_Store

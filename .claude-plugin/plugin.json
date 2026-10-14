@@ -1,0 +1,12 @@
+{
+  "name": "ama-kit",
+  "displayName": "AMA Kit (Ask Me Anything)",
+  "version": "0.3.0",
+  "description": "Hiểu ngữ cảnh task, phân tích requirement và chạy QE mobile từ Jira, Confluence, Figma và Appium/BrowserStack, qua CLI không phụ thuộc",
+  "author": {
+    "name": "ama-kit maintainers"
+  },
+  "license": "MIT",
+  "keywords": ["qe", "requirements", "jira", "confluence", "figma", "appium", "browserstack"],
+  "skills": ["./workflows/"]
+}

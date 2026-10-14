@@ -1,0 +1,14 @@
+{
+  "name": "ama",
+  "description": "ama-kit (Ask Me Anything kit) cho QE: hiểu ngữ cảnh task, phân tích requirement, chạy test mobile",
+  "owner": {
+    "name": "ama-kit maintainers"
+  },
+  "plugins": [
+    {
+      "name": "ama-kit",
+      "source": "./",
+      "description": "Hiểu ngữ cảnh task, phân tích requirement và chạy QE mobile từ Jira, Confluence, Figma và Appium/BrowserStack"
+    }
+  ]
+}

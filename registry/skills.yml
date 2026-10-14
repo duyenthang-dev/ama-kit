@@ -1,0 +1,142 @@
+# Danh mục skill trung lập với provider. Adapter (providers/*) và validator đọc file này.
+# Mỗi skill: name, description, triggers (không trùng nhau giữa các skill), entrypoint (lệnh CLI trong bin/),
+# skillPath (SKILL.md), capabilities, inputs, outputs.
+# capabilities: read:<nguồn> chỉ đọc; write:<đích> cần người dùng xác nhận (rules/confirm-before-write.md).
+
+version: 1
+skills:
+  - name: setup
+    description: Cài đặt kit trên máy - biến môi trường hoặc keychain cho Atlassian, Figma, BrowserStack và config dự án.
+    triggers:
+      - cài đặt ama-kit
+      - thiếu biến môi trường
+      - kiểm tra kết nối
+    entrypoint: workflow doctor
+    skillPath: skills/setup/SKILL.md
+    capabilities:
+      - read:local-config
+    inputs: []
+    outputs:
+      - .ama/project.yml
+
+  - name: jira
+    description: Đọc một issue Jira thành Markdown hoặc thêm comment sau khi người dùng xác nhận.
+    triggers:
+      - đọc issue jira
+      - xem ticket
+      - comment lên jira
+    entrypoint: jira issue <KEY>
+    skillPath: skills/jira/SKILL.md
+    capabilities:
+      - read:jira
+      - write:jira-comment
+    inputs:
+      - issue key
+    outputs:
+      - Markdown của issue
+
+  - name: confluence
+    description: Đọc một page Confluence theo URL hoặc ID thành Markdown.
+    triggers:
+      - đọc page confluence
+      - link confluence
+      - spec trên confluence
+    entrypoint: confluence page <url-hoặc-id>
+    skillPath: skills/confluence/SKILL.md
+    capabilities:
+      - read:confluence
+    inputs:
+      - URL hoặc page ID
+    outputs:
+      - Markdown của page
+
+  - name: figma
+    description: Tải PNG các frame Figma rồi xem và mô tả màn hình.
+    triggers:
+      - xem thiết kế figma
+      - link figma
+      - tải frame figma
+    entrypoint: figma export
+    skillPath: skills/figma/SKILL.md
+    capabilities:
+      - read:figma
+    inputs:
+      - link Figma có node-id, hoặc frame trong config
+    outputs:
+      - PNG từng frame
+
+  - name: mobile-test
+    description: Chạy smoke test Android bằng Appium 2 trên BrowserStack và đọc kết quả session.
+    triggers:
+      - chạy smoke test
+      - upload apk
+      - session browserstack fail
+    entrypoint: mobile-test run --suite smoke
+    skillPath: skills/mobile-test/SKILL.md
+    capabilities:
+      - read:browserstack
+      - write:browserstack-upload
+      - write:browserstack-session
+    inputs:
+      - app (.apk hoặc bs://)
+      - issue key (tùy chọn)
+    outputs:
+      - report/mobile.md
+      - session URL, video, screenshot
+
+  - name: context-brief
+    description: Đọc một vòng quanh issue A (cha, con, chặn, bị chặn, page gắn kèm) và tóm tắt ngữ cảnh. Chỉ đọc.
+    triggers:
+      - tổng hợp ngữ cảnh
+      - hiểu task liên quan
+      - task này nằm ở đâu trong dự án
+    entrypoint: context-brief <KEY>
+    skillPath: skills/context-brief/SKILL.md
+    capabilities:
+      - read:jira
+      - read:confluence
+    inputs:
+      - issue key
+    outputs:
+      - runs/<KEY>-context-<thời điểm>/report/context-brief.md
+
+  - name: analyze-requirement
+    description: Phân tích requirement của một issue từ Jira, Confluence và Figma - tiêu chí chấp nhận có ID, gap, câu hỏi mở.
+    triggers:
+      - phân tích requirement
+      - review acceptance criteria
+      - story này đủ rõ chưa
+    entrypoint: analyze-requirement <KEY>
+    skillPath: workflows/analyze-requirement/SKILL.md
+    capabilities:
+      - read:jira
+      - read:confluence
+      - read:figma
+    inputs:
+      - issue key
+    outputs:
+      - runs/<KEY>-<thời điểm>/report/analysis.md
+      - runs/<KEY>-<thời điểm>/report/ac.json
+
+  - name: qe
+    description: Từ run đã phân tích - chiến lược test, test plan, test case, hai ma trận truy vết, kết quả smoke và comment tóm tắt.
+    triggers:
+      - lập test plan
+      - viết test case
+      - qe workflow
+    entrypoint: qe-workflow <KEY>
+    skillPath: workflows/qe/SKILL.md
+    capabilities:
+      - read:run
+      - write:jira-comment
+      - write:browserstack-session
+    inputs:
+      - issue key đã có run
+    outputs:
+      - report/test-strategy.md
+      - report/test-plan.md
+      - report/test-cases.md
+      - report/traceability-objectives.md
+      - report/traceability-tests.md
+      - report/mobile.md
+      - report/summary.md

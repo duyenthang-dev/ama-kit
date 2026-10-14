@@ -1,0 +1,27 @@
+{
+  "name": "ama-kit",
+  "version": "0.3.0",
+  "private": true,
+  "description": "ama-kit (Ask Me Anything kit): CLI và skill để hiểu ngữ cảnh task, phân tích requirement và chạy QE mobile với Jira, Confluence, Figma, Appium/BrowserStack",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "ama": "bin/ama.js",
+    "jira": "bin/jira.js",
+    "confluence": "bin/confluence.js",
+    "figma": "bin/figma.js",
+    "mobile-test": "bin/mobile-test.js",
+    "context-brief": "bin/context-brief.js",
+    "analyze-requirement": "bin/analyze-requirement.js",
+    "qe-workflow": "bin/qe-workflow.js",
+    "workflow": "bin/workflow.js"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "validate": "node scripts/validate-governance.js",
+    "adapt:cursor": "node providers/cursor/adapt.js --out .cursor/rules"
+  },
+  "license": "MIT"
+}
