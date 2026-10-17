@@ -15,6 +15,7 @@ Gọi CLI, không tự gọi REST: `node "${CLAUDE_PLUGIN_ROOT}/bin/figma.js" ..
    - link frame (có `?node-id=`): thêm `--url "<link>"` (lặp lại được)
    - file key và node: `--file <KEY> --nodes 12:34,56:78`
    Link không có `node-id` là cả file: nhờ người dùng chọn frame và "Copy link to selection".
+   Link tới một page hoặc section được mở rộng thành các màn hình bên trong; manifest ghi `parent` là page/section chứa nó.
 2. Đặt `--out` trong thư mục tạm hoặc thư mục run, không trong mã nguồn. Mỗi dòng đầu ra: `node id ⇥ tên ⇥ file png`.
 3. Mở từng PNG bằng công cụ Read và **nhìn ảnh**. Mô tả những gì thấy: tên màn, thành phần, câu chữ, trạng thái
    (lỗi, rỗng, đang tải, vô hiệu), chỗ bị cắt hay thiếu.

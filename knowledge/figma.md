@@ -22,6 +22,9 @@ sources:
 
 - Frame khai báo trong config (`figma.frames`): các màn hình luôn cần.
 - Frame được link trong issue hoặc page **có `node-id`**. Link cả file (không `node-id`) bị bỏ qua kèm cảnh báo.
+- Link tới **page** (CANVAS) hoặc **section** được mở rộng thành các màn hình bên trong (frame, component,
+  instance), đi sâu tối đa 2 tầng section. Node chữ, nhóm trang trí bị bỏ. Số màn tối đa theo `limits.maxFrames`.
+  Lấy link page/section: chọn page hoặc section trong Figma rồi copy URL (có `?node-id=`).
 
 ## Báo cáo phải giữ
 

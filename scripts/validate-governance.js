@@ -200,8 +200,13 @@ export function validateGovernance({ root = KIT_ROOT, bannedTerms } = {}) {
   }
   checked.bannedTerms = terms.length;
 
-  // 8. token thật
+  // 8. token thật (bỏ qua .env/.env.local nếu đã có trong .gitignore — đó là chỗ để token trên máy)
+  const ignored = fs.existsSync(p('.gitignore')) ? read(p('.gitignore')).split(/\r?\n/).map((l) => l.trim()) : [];
+  for (const name of ['.env', '.env.local']) {
+    if (fs.existsSync(p(name)) && !ignored.includes(name)) errors.push(`${name} chưa có trong .gitignore`);
+  }
   for (const f of walk(root)) {
+    if (path.dirname(f) === root && ['.env', '.env.local'].includes(path.basename(f)) && ignored.includes(path.basename(f))) continue;
     if (!/\.(js|mjs|md|yml|yaml|json|txt|env|example)$/.test(f) || f.includes(`${path.sep}node_modules${path.sep}`)) continue;
     const text = read(f);
     for (const re of SECRET_PATTERNS) if (re.test(text)) errors.push(`${relp(f)}: có thể chứa token thật`);

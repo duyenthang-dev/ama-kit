@@ -78,19 +78,24 @@ export async function run(argv) {
       console.log(`analyze-requirement: ${a || 'chưa có'}`);
       if (!a) return console.log(`\nBước tiếp: analyze-requirement ${key}`), 0;
       const has = (f) => fs.existsSync(path.join(a, 'report', f));
-      const steps = [
-        ['analysis.md', `skill analyze-requirement viết report/analysis.md`],
-        ['ac.json', 'skill analyze-requirement viết report/ac.json'],
-        ['test-strategy.md', `skill qe viết report/test-strategy.md`],
-        ['test-plan.md', 'skill qe viết report/test-plan.md'],
-        ['test-cases.json', 'skill qe viết report/test-cases.json rồi chạy qe-workflow'],
-        ['traceability-tests.md', `qe-workflow ${key}`],
-        ['mobile.md', `mobile-test run --suite smoke --issue ${key} (sau khi người dùng xác nhận) hoặc ghi lý do chưa chạy`],
-        ['summary.md', 'skill qe viết report/summary.md'],
-      ];
-      for (const [f] of steps) console.log(`  ${has(f) ? '✔' : '·'} report/${f}`);
-      const next = steps.find(([f]) => !has(f));
-      console.log(next ? `\nBước tiếp: ${next[1]}` : `\nBước tiếp: xem trước rồi "jira comment ${key} --file ${path.join(a, 'report', 'summary.md')}" sau khi người dùng xác nhận.`);
+      const mark = (f) => console.log(`  ${has(f) ? '✔' : '·'} report/${f}`);
+      // 1. phân tích (bắt buộc cho QE)
+      ['analysis.md', 'ac.json'].forEach(mark);
+      if (!has('analysis.md') || !has('ac.json')) return console.log('\nBước tiếp: skill analyze-requirement đọc nguồn rồi viết report/ac.json và report/analysis.md'), 0;
+      // 2. QE: không có danh sách cố định; theo report/qe-plan.json do agent lập
+      let plan = null;
+      try {
+        plan = JSON.parse(fs.readFileSync(path.join(a, 'report', 'qe-plan.json'), 'utf8'));
+      } catch {}
+      if (!plan) return console.log(`\nBước tiếp: skill qe đọc nguồn, lập report/qe-plan.json (chọn artifact cần làm) rồi làm theo; kiểm bằng "qe-workflow ${key}".`), 0;
+      console.log(`  ✔ report/qe-plan.json — ${String(plan.rationale || '').split('\n')[0]}`);
+      const chosen = (plan.deliverables || []).map((d) => d.file).filter(Boolean);
+      chosen.forEach(mark);
+      for (const d of plan.skipped || []) console.log(`  – bỏ report/${d.file} — ${d.why || ''}`);
+      const todo = chosen.filter((f) => !has(f));
+      if (todo.length) console.log(`\nBước tiếp: làm ${todo.join(', ')} theo kế hoạch, rồi "qe-workflow ${key}".`);
+      else if (chosen.includes('summary.md')) console.log(`\nBước tiếp: xem trước rồi "jira comment ${key} --file ${path.join(a, 'report', 'summary.md')}" sau khi người dùng xác nhận.`);
+      else console.log('\nĐủ theo kế hoạch.');
       return 0;
     }
     default:

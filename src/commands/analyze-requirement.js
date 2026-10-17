@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs, printPlan, requireIssueKey } from '../args.js';
 import { confluenceClient } from '../clients/confluence.js';
@@ -9,12 +11,12 @@ import { issueToMarkdown } from '../issue.js';
 import { normalizeNodeId, parseFigmaUrl } from '../links.js';
 import { writeSource } from '../output.js';
 import { makeCleaner } from '../redact.js';
-import { createRun, rel, runsRoot, updateManifest } from '../run-layout.js';
+import { createRun, latestRun, readJson, rel, runsRoot, updateManifest } from '../run-layout.js';
 
 export const HELP = `analyze-requirement — gom dữ liệu để phân tích requirement của một issue
 
 Cách dùng
-  analyze-requirement <PROJ-123> [--no-confluence] [--no-figma] [--force] [--config <file>] [--dry-run]
+  analyze-requirement <PROJ-123> [--no-confluence] [--no-figma] [--force] [--fresh] [--config <file>] [--dry-run]
 
 Tạo runs/<KEY>-<thời điểm>/ gồm:
   jira/issue.md            issue: summary, mô tả, tiêu chí chấp nhận (nguyên văn + nguồn), link
@@ -23,7 +25,9 @@ Tạo runs/<KEY>-<thời điểm>/ gồm:
   report/                  nơi skill analyze-requirement viết analysis.md và ac.json
   manifest.json            nguồn đã lấy, cảnh báo, những gì đã bị che
 
-Lệnh này chỉ lấy dữ liệu. Phần phân tích do skill (workflows/analyze-requirement) làm.
+Lệnh này chỉ lấy dữ liệu. Phần phân tích (report/analysis.md, ac.json) do Claude viết qua skill
+analyze-requirement: trong Claude Code nói "phân tích <KEY>" hoặc gõ /ama-kit:analyze-requirement <KEY>.
+Nguồn (issue, page, frame) không đổi so với run trước đã có report → chép report/ sang run mới (--fresh để bỏ qua).
 Mã thoát: 0 xong (kể cả khi vài nguồn lỗi, xem cảnh báo), 1 lỗi API với issue, 2 sai cách dùng, 3 thiếu biến môi trường.
 `;
 
@@ -32,6 +36,7 @@ export async function run(argv) {
     'no-confluence': { type: 'boolean' },
     'no-figma': { type: 'boolean' },
     force: { type: 'boolean' },
+    fresh: { type: 'boolean' },
     config: { type: 'string' },
   });
   if (help) return process.stdout.write(HELP), 0;
@@ -51,8 +56,10 @@ export async function run(argv) {
 
   const jira = jiraClient(project);
   const issue = await jira.getIssue(key); // lỗi ở đây là lỗi thật: dừng trước khi tạo thư mục
+  const previous = latestRun(project, key);
   const dir = createRun(project, key);
   const warnings = [];
+  if (!project.file) warnings.push(`Không thấy .ama/project.yml; runs/ được tạo ngay trong ${process.cwd()}. Nên chạy từ thư mục QE của dự án (có .ama/project.yml) để không lẫn vào repo code.`);
   const notes = {};
 
   // 1. Issue
@@ -81,6 +88,7 @@ export async function run(argv) {
 
   // 3. Frame Figma: config + link có node-id trong issue/page
   let frames = [];
+  const figmaVersions = {};
   if (!flags['no-figma']) {
     const byFile = new Map();
     const add = (fk, nodeId, name) => {
@@ -108,14 +116,28 @@ export async function run(argv) {
     for (const [fileKey, nodes] of byFile) {
       if (budget <= 0) break;
       const take = nodes.slice(0, budget);
-      budget -= take.length;
       try {
-        const res = await exportFrames(fileKey, take, path.join(dir, 'figma'), { force: flags.force });
+        const res = await exportFrames(fileKey, take, path.join(dir, 'figma'), { force: flags.force, maxFrames: budget });
+        budget -= res.frames.length;
+        if (res.version) figmaVersions[fileKey] = res.version;
         warnings.push(...res.warnings);
         frames.push(...res.frames.map(({ file, ...f }) => ({ ...f, file: rel(dir, file) })));
       } catch (e) {
         warnings.push(`Figma file ${fileKey}: ${firstLine(e)}`);
       }
+    }
+  }
+
+  const sourceHash = hashSources(dir, pages, frames, figmaVersions);
+  let carried = null;
+  if (!flags.fresh && previous && previous !== dir) {
+    const prev = readJson(path.join(previous, 'manifest.json'));
+    const prevReport = path.join(previous, 'report');
+    if (prev?.sourceHash === sourceHash && fs.existsSync(path.join(prevReport, 'ac.json'))) {
+      const files = fs.readdirSync(prevReport).filter((f) => fs.statSync(path.join(prevReport, f)).isFile());
+      fs.mkdirSync(path.join(dir, 'report'), { recursive: true });
+      for (const f of files) fs.copyFileSync(path.join(prevReport, f), path.join(dir, 'report', f));
+      carried = { from: path.basename(previous), files };
     }
   }
 
@@ -131,6 +153,8 @@ export async function run(argv) {
     },
     dataBoundary: notes,
     warnings,
+    sourceHash,
+    ...(carried ? { reportCarriedFrom: carried.from } : {}),
   });
 
   console.log(`Thư mục run: ${dir}\n`);
@@ -140,5 +164,28 @@ export async function run(argv) {
   console.log(`Figma:      ${frames.length} frame${frames.map((f) => `\n  - ${f.file}  (${f.name}, ${f.nodeId})`).join('')}`);
   if (Object.keys(notes).length) console.log(`\nGiới hạn dữ liệu:\n${Object.entries(notes).map(([f, n]) => `  - ${f}: ${n}`).join('\n')}`);
   if (warnings.length) console.log(`\nCảnh báo:\n${warnings.map((w) => `  ! ${w}`).join('\n')}`);
+  if (carried) {
+    console.log(`\nNguồn không đổi so với ${carried.from} → đã chép report/ (${carried.files.length} file: ${carried.files.join(', ')}).`);
+    console.log(`Muốn phân tích lại từ đầu: analyze-requirement ${key} --fresh.`);
+  } else {
+    console.log(`\nreport/ đang trống: lệnh này chỉ lấy dữ liệu. Phân tích do Claude viết — trong Claude Code nói "phân tích ${key}"`);
+    console.log(`(hoặc /ama-kit:analyze-requirement ${key}); Claude đọc run này, viết report/analysis.md, ac.json rồi chạy qe-workflow.`);
+    if (previous) console.log(`Nguồn đã đổi so với ${path.basename(previous)} (hoặc run đó chưa có report) nên không chép report cũ.`);
+  }
   return 0;
+}
+
+/** Dấu vân tay của nguồn: nội dung issue + page, danh sách frame + version file Figma (không phụ thuộc byte PNG). */
+function hashSources(dir, pages, frames, figmaVersions) {
+  const h = crypto.createHash('sha256');
+  const add = (label, file) => {
+    h.update(label);
+    try {
+      h.update(fs.readFileSync(path.join(dir, file)));
+    } catch {}
+  };
+  add('issue', 'jira/issue.md');
+  for (const p of [...pages].sort((a, b) => String(a.id).localeCompare(String(b.id)))) add(`page:${p.id}:${p.version}`, p.file);
+  for (const f of [...frames].sort((a, b) => `${a.fileKey}:${a.nodeId}`.localeCompare(`${b.fileKey}:${b.nodeId}`))) h.update(`frame:${f.fileKey}:${f.nodeId}:${figmaVersions[f.fileKey] || ''}`);
+  return h.digest('hex').slice(0, 16);
 }

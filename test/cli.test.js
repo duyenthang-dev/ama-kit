@@ -2,7 +2,10 @@
 
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { cli, mockServer, tmpdir } from './helpers.js';
+import { execFile, execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { cli, KIT, mockServer, tmpdir } from './helpers.js';
 
 const COMMANDS = ['jira', 'confluence', 'figma', 'mobile-test', 'context-brief', 'analyze-requirement', 'qe-workflow', 'workflow', 'ama'];
 let mock;
@@ -80,4 +83,80 @@ test('lỗi API: mã 1', async () => {
   assert.equal(r.code, 1);
   assert.match(r.stderr, /HTTP 500/);
   assert.ok(!r.stderr.includes('tok-123456'));
+});
+
+test('.ama/.env: đọc biến từ file; token chỉ đọc khi git bỏ qua file', async () => {
+  const dir = tmpdir();
+  fs.mkdirSync(path.join(dir, '.ama'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.ama', '.env'), 'export ATLASSIAN_EMAIL="qe@example.com"\nATLASSIAN_API_TOKEN=file-token-value-123\n');
+  const env = { AMA_NO_ENV_FILE: '', AMA_NO_KIT_ENV_FILE: '1' }; // không lẫn .env thật ở gốc kit
+  // ngoài repo git: đọc được, token hiện đã che
+  let r = await cli('workflow', ['doctor', '--only', 'none'], { cwd: dir, env });
+  assert.match(r.stdout, /ATLASSIAN_EMAIL\s+qe@example\.com\s+\[file:/);
+  assert.match(r.stdout, /ATLASSIAN_API_TOKEN\s+fil…123\s+\[file:/);
+  assert.doesNotMatch(r.stdout + r.stderr, /file-token-value/);
+  // trong repo git, chưa gitignore: bỏ qua token
+  execFileSync('git', ['init', '-q', dir]);
+  r = await cli('workflow', ['doctor', '--only', 'none'], { cwd: dir, env });
+  assert.match(r.stdout, /ATLASSIAN_API_TOKEN\s+chưa đặt/);
+  assert.match(r.stderr, /bỏ qua ATLASSIAN_API_TOKEN/);
+  // gitignore rồi: đọc được
+  fs.writeFileSync(path.join(dir, '.gitignore'), '.ama/\n');
+  r = await cli('workflow', ['doctor', '--only', 'none'], { cwd: dir, env });
+  assert.match(r.stdout, /ATLASSIAN_API_TOKEN\s+fil…123\s+\[file:/);
+});
+
+test('install-claude: --help, --dry-run không gọi claude, tham số lạ → 2', async () => {
+  const run = (a) =>
+    new Promise((res) => execFile(process.execPath, [path.join(KIT, 'scripts', 'install-claude.js'), ...a], { env: { PATH: '', HOME: tmpdir() } }, (err, stdout, stderr) => res({ code: err ? err.code : 0, stdout, stderr })));
+  let r = await run(['--help']);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /--uninstall/);
+  r = await run(['--dry-run']); // PATH rỗng: nếu gọi claude thật sẽ lỗi
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /\(dry-run\) claude plugin install ama-kit@ama/);
+  r = await run(['--force']);
+  assert.equal(r.code, 2);
+});
+
+test('session-context (hook SessionStart): tóm tắt dự án, không có credential, luôn thoát 0', async () => {
+  const run = (cwd) =>
+    new Promise((res) => execFile(process.execPath, [path.join(KIT, 'scripts', 'session-context.js')], { cwd, env: { PATH: process.env.PATH, HOME: cwd, ATLASSIAN_API_TOKEN: 'secret-value-xyz' } }, (err, stdout) => res({ code: err ? err.code : 0, stdout })));
+  const dir = tmpdir();
+  let r = await run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /chưa có \.ama\/project\.yml/);
+  fs.mkdirSync(path.join(dir, '.ama'));
+  fs.writeFileSync(path.join(dir, '.ama', 'project.yml'), 'project:\n  key: PROJ\n');
+  r = await run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /PROJ-123/);
+  assert.match(r.stdout, /ama-kit:analyze-requirement/);
+  assert.match(r.stdout, /knowledge\/requirement-analysis\.md/);
+  assert.doesNotMatch(r.stdout, /secret-value/);
+});
+
+test('qe-workflow: artifact là tùy chọn; qe-plan.json quyết định làm gì', async () => {
+  const dir = tmpdir();
+  const report = path.join(dir, 'run', 'report');
+  fs.mkdirSync(report, { recursive: true });
+  fs.writeFileSync(path.join(report, 'ac.json'), JSON.stringify({ issueKey: 'WEB-1', acceptanceCriteria: [{ id: 'AC-1', original: 'Bấm nút thì mở popup', source: 'jira', sourceRef: 'mô tả', quality: 'testable', moscow: 'must', testLevel: 'e2e' }], gaps: [], questions: [] }));
+  const runDir = path.join(dir, 'run');
+  let r = await cli('qe-workflow', [runDir], { cwd: dir });
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /đều tùy chọn/);
+  assert.doesNotMatch(r.stdout, /Còn thiếu/);
+  // kế hoạch: chỉ test case + summary, bỏ mobile
+  fs.writeFileSync(path.join(report, 'qe-plan.json'), JSON.stringify({ rationale: 'Story web nhỏ', deliverables: [{ file: 'summary.md', why: 'báo PO' }], skipped: [{ file: 'mobile.md', why: 'WebApp' }] }));
+  r = await cli('qe-workflow', [runDir], { cwd: dir });
+  assert.equal(r.code, 0);
+  assert.match(r.stdout, /bỏ mobile\.md — WebApp/);
+  assert.match(r.stdout, /Còn làm theo kế hoạch: summary\.md/);
+  fs.writeFileSync(path.join(report, 'summary.md'), 'ok');
+  r = await cli('qe-workflow', [runDir], { cwd: dir });
+  assert.match(r.stdout, /Đủ theo kế hoạch/);
+  // bỏ mà không nói lý do → 2
+  fs.writeFileSync(path.join(report, 'qe-plan.json'), JSON.stringify({ rationale: 'x', deliverables: [], skipped: [{ file: 'test-plan.md' }] }));
+  r = await cli('qe-workflow', [runDir], { cwd: dir });
+  assert.equal(r.code, 2);
 });

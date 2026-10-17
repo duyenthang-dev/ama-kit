@@ -83,8 +83,14 @@ function routes(req, url, body, base) {
   }
   if (pth === '/v1/files/FIGKEY/nodes') {
     const names = { '1:2': 'Login', '3:4': 'Login error', '5:6': 'Home' };
+    // Page 9:0 chứa section 9:1 (Login, Login error) và frame Home; section 9:1 lồng bên trong.
+    const containers = {
+      '9:0': { name: '3.3 Quản lý đơn hàng', type: 'CANVAS', children: [{ id: '9:1', name: 'Quản lý đơn hàng', type: 'SECTION' }, { id: '5:6', name: 'Home', type: 'FRAME' }, { id: '9:9', name: 'Ghi chú', type: 'TEXT' }] },
+      '9:1': { name: 'Quản lý đơn hàng', type: 'SECTION', children: [{ id: '1:2', name: 'Login', type: 'FRAME' }, { id: '3:4', name: 'Login error', type: 'FRAME' }] },
+    };
     const ids = url.searchParams.get('ids').split(',');
-    return [200, { version: '99', nodes: Object.fromEntries(ids.map((i) => [i, names[i] ? { document: { name: names[i], type: 'FRAME' } } : null])) }];
+    const doc = (i) => (containers[i] ? { document: containers[i] } : names[i] ? { document: { name: names[i], type: 'FRAME' } } : null);
+    return [200, { version: '99', nodes: Object.fromEntries(ids.map((i) => [i, doc(i)])) }];
   }
   if (pth === '/v1/images/FIGKEY') {
     const ids = url.searchParams.get('ids').split(',');
@@ -263,5 +269,37 @@ test('workflow status chỉ ra bước tiếp theo', async () => {
   const r = await run('workflow', ['status', 'PROJ-1']);
   assert.equal(r.code, 0);
   assert.match(r.stdout, /✔ report\/ac\.json/);
-  assert.match(r.stdout, /Bước tiếp: skill analyze-requirement viết report\/analysis\.md/);
+  assert.match(r.stdout, /Bước tiếp: skill analyze-requirement đọc nguồn rồi viết report\/ac\.json và report\/analysis\.md/);
+});
+
+test('figma export: link tới page/section được mở rộng thành các màn hình bên trong', async () => {
+  const out = path.join(work, 'figma-page');
+  const r = await run('figma', ['export', '--url', 'https://www.figma.com/design/FIGKEY/App?node-id=9-0', '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  const lines = r.stdout.trim().split('\n').map((l) => l.split('\t')[0]).sort();
+  assert.deepEqual(lines, ['1:2', '3:4', '5:6']);
+  assert.equal(fs.readdirSync(out).filter((f) => f.endsWith('.png')).length, 3);
+  assert.ok(!r.stdout.includes('Ghi chú'), 'node TEXT không phải màn hình');
+});
+
+test('figma export: có cả link màn cụ thể và link section thì chỉ lấy màn cụ thể', async () => {
+  const out = path.join(work, 'figma-mixed');
+  const r = await run('figma', ['export', '--nodes', '9:0,1:2', '--file', 'FIGKEY', '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  const lines = r.stdout.trim().split('\n').map((l) => l.split('\t')[0]);
+  assert.deepEqual(lines, ['1:2']);
+  assert.match(r.stderr, /Bỏ qua .*vì đã có link tới màn hình cụ thể/);
+});
+
+test('analyze-requirement: nguồn không đổi thì chép report từ run trước; --fresh thì không', async () => {
+  let r = await run('analyze-requirement', ['PROJ-1']);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /Nguồn không đổi so với PROJ-1-.* → đã chép report\//);
+  const dir = path.join(runsDir(), latest(/^PROJ-1-\d/));
+  assert.ok(fs.existsSync(path.join(dir, 'report', 'ac.json')));
+  assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).reportCarriedFrom);
+  r = await run('analyze-requirement', ['PROJ-1', '--fresh']);
+  assert.match(r.stdout, /report\/ đang trống/);
+  const fresh = path.join(runsDir(), latest(/^PROJ-1-\d/));
+  assert.ok(!fs.existsSync(path.join(fresh, 'report', 'ac.json')));
 });

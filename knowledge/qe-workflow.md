@@ -13,10 +13,11 @@ sources:
 context-brief KEY        (tùy chọn) hiểu task trong dự án     → runs/KEY-context-<t>/report/context-brief.md
 analyze-requirement KEY  lấy issue, page, frame                → runs/KEY-<t>/{jira,confluence,figma}/
   skill analyze-requirement                                    → report/analysis.md, report/ac.json
-skill qe                                                       → report/test-strategy.md, test-plan.md, test-cases.json
-qe-workflow KEY          kiểm schema, sinh truy vết            → report/test-cases.md, traceability-*.md
-mobile-test run --suite smoke --issue KEY --yes  (sau xác nhận) → report/mobile.md
-jira comment KEY --file report/summary.md --yes  (sau xác nhận)
+skill qe: đọc nguồn, tự lên kế hoạch                          → report/qe-plan.json
+  rồi làm các artifact đã chọn (tùy chọn)                     → test-strategy.md, test-plan.md, test-cases.json, mobile.md, summary.md
+qe-workflow KEY          kiểm schema, sinh truy vết, đối chiếu kế hoạch → report/test-cases.md, traceability-*.md
+mobile-test run --suite smoke --issue KEY --yes  (nếu kế hoạch có, sau xác nhận) → report/mobile.md
+jira comment KEY --file report/summary.md --yes  (nếu kế hoạch có, sau xác nhận)
 ```
 
 ## report/ac.json
@@ -42,6 +43,29 @@ jira comment KEY --file report/summary.md --yes  (sau xác nhận)
   "questions": [{ "id": "Q-1", "question": "...", "relatesTo": ["AC-2", "GAP-1"], "priority": "high | medium | low", "askWho": "PO | designer | dev" }]
 }
 ```
+
+## report/qe-plan.json
+
+Không artifact QE nào bắt buộc. Agent đọc Jira, Confluence, Figma, analysis rồi chọn; mỗi lựa chọn có lý do.
+
+```json
+{
+  "issueKey": "PROJ-123",
+  "rationale": "Story web, chưa sẵn sàng: ưu tiên câu hỏi; test case nháp theo giả định",
+  "deliverables": [
+    { "file": "test-cases.json", "why": "phủ AC-1..AC-3 để dev ước lượng" },
+    { "file": "summary.md", "why": "đưa câu hỏi chặn lên Jira" }
+  ],
+  "skipped": [
+    { "file": "mobile.md", "why": "tính năng WebApp, không có app" },
+    { "file": "test-strategy.md", "why": "story nhỏ, tầng test ghi ngay trong test case" }
+  ]
+}
+```
+
+Danh mục thường dùng: `test-strategy.md`, `test-plan.md`, `test-cases.json`, `mobile.md`, `summary.md`; được thêm file
+khác trong `report/` (vd. `exploratory-charter.md`) nếu issue cần. `qe-workflow` báo lỗi (mã 2) khi thiếu `rationale`
+hoặc thiếu `why`; liệt kê artifact đã chọn mà chưa có.
 
 ## report/test-cases.json
 

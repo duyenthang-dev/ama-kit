@@ -13,7 +13,7 @@ export const PNG = Buffer.from('89504e470d0a1a0a0000000d494844520000000100000001
 /** Chạy bin/<cmd>.js; luôn resolve với { code, stdout, stderr }. */
 export function cli(cmd, args, { cwd, env = {} } = {}) {
   return new Promise((resolve) => {
-    execFile(process.execPath, [path.join(KIT, 'bin', `${cmd}.js`), ...args], { cwd: cwd || KIT, env: { PATH: process.env.PATH, HOME: cwd || os.tmpdir(), AMA_NO_KEYCHAIN: '1', ...env } }, (err, stdout, stderr) =>
+    execFile(process.execPath, [path.join(KIT, 'bin', `${cmd}.js`), ...args], { cwd: cwd || KIT, env: { PATH: process.env.PATH, HOME: cwd || os.tmpdir(), AMA_NO_KEYCHAIN: '1', AMA_NO_ENV_FILE: '1', ...env } }, (err, stdout, stderr) =>
       resolve({ code: err ? err.code : 0, stdout, stderr })
     );
   });

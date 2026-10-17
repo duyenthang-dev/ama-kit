@@ -1,0 +1,17 @@
+{
+  "description": "Nạp tóm tắt ama-kit (dự án, skill nào dùng khi nào, quy tắc, mục lục knowledge) vào đầu mỗi phiên",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.js\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

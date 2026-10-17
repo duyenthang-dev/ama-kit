@@ -18,6 +18,17 @@ claude plugin marketplace add <github-user>/ama-kit
 claude plugin install ama-kit@ama
 ```
 
+Hoặc từ repo đã clone trên máy, một lệnh (cài mới hoặc cập nhật, tạo `~/.ama/.env` nếu chưa có):
+
+```bash
+npm run claude:install            # = node scripts/install-claude.js
+node scripts/install-claude.js --check      # cài xong thử kết nối Jira/Confluence/Figma
+node scripts/install-claude.js --dry-run    # chỉ in các bước
+npm run claude:uninstall
+```
+
+Plugin chạy từ bản copy trong cache của Claude Code, nên sửa code kit xong phải chạy lại `npm run claude:install`.
+
 Trong Claude Code, chạy `/ama-kit:setup` để được hướng dẫn đặt biến môi trường và tạo config dự án.
 
 ### Dùng trực tiếp từ repo
@@ -58,6 +69,18 @@ security add-generic-password -s ama-kit -a ATLASSIAN_API_TOKEN -w
 
 Linux: `secret-tool store --label=ama-kit service ama-kit account ATLASSIAN_API_TOKEN`.
 
+Hoặc đặt bằng file (tiện cho máy cá nhân):
+
+```bash
+mkdir -p ~/.ama && cp .env.example ~/.ama/.env   # dùng chung mọi dự án; hoặc <project>/.ama/.env cho riêng dự án
+# rồi điền giá trị vào ~/.ama/.env — KHÔNG điền vào .env.example (file đó được commit)
+```
+
+Thứ tự ưu tiên: biến môi trường → `.ama/.env` của dự án → `~/.ama/.env` → `.env` ở gốc kit → keychain.
+Cài dạng plugin Claude Code thì dùng `~/.ama/.env` (plugin chạy từ bản copy trong cache, không thấy `.env` ở repo kit). Kit chỉ đọc token từ `.env`
+khi git bỏ qua file đó (có trong `.gitignore`, hoặc nằm ngoài repo); nếu không, token bị bỏ qua kèm cảnh báo.
+`ATLASSIAN_SITE` cũng có thể bỏ trống nếu config dự án đã có `jira.site`.
+
 ## Config dự án
 
 Mẫu: [config/project.example.yml](config/project.example.yml). Không chứa token.
@@ -80,10 +103,14 @@ Khóa chính: `project.key`, `jira.site`, `confluence.site`, `confluence.spaceKe
 | `mobile-test run --suite smoke [--issue KEY] [--yes]` | Appium 2, một device Android trên BrowserStack; session URL, video, screenshot. Hỏi trước khi upload app hoặc mở session |
 | `context-brief PROJ-123` | Đọc một vòng quanh issue: cha, con, A chặn, chặn A, page gắn kèm |
 | `analyze-requirement PROJ-123` | Tạo `runs/<KEY>-<thời điểm>/` gồm issue, page, ảnh; skill viết `report/analysis.md` |
-| `qe-workflow PROJ-123` | Kiểm schema, sinh test case và hai ma trận truy vết |
+| `qe-workflow PROJ-123` | Kiểm schema, sinh test case và hai ma trận truy vết, đối chiếu với kế hoạch QE (`qe-plan.json`) |
 | `workflow skills \| rules \| adapt cursor --out <dir> \| validate \| init \| doctor \| status KEY` | Quản lý kit |
 
 ## Skill (Claude Code)
+
+Không cần gõ slash command: plugin có hook `SessionStart` (`hooks/hooks.json` → `scripts/session-context.js`). Mở Claude Code
+trong project có `.ama/project.yml`, hook nạp sẵn vào phiên: dự án nào, việc nào dùng skill nào, quy tắc bắt buộc, mục lục
+knowledge và các run gần nhất (~800 token, không đọc credential, không gọi mạng). Cứ nói tự nhiên, vd. "phân tích SCRUM-11".
 
 | Skill | Dùng khi |
 |---|---|
@@ -98,7 +125,7 @@ Luồng thường dùng:
 ```
 context-brief PROJ-123        (tùy chọn) hiểu task trong bối cảnh dự án
 analyze-requirement PROJ-123  → runs/PROJ-123-<thời điểm>/report/analysis.md, ac.json
-qe-workflow PROJ-123          → test-strategy, test-plan, test-cases, traceability-*, mobile, summary → comment Jira
+/ama-kit:qe PROJ-123          → đọc nguồn, tự lên kế hoạch (qe-plan.json), chỉ làm artifact cần thiết → comment Jira
 ```
 
 Agent đọc các artifact trong `runs/` khi cần phân tích lỗi. Schema: [knowledge/qe-workflow.md](knowledge/qe-workflow.md).
@@ -107,6 +134,7 @@ Agent đọc các artifact trong `runs/` khi cần phân tích lỗi. Schema: [k
 
 ```
 .claude-plugin/       manifest plugin và marketplace cho Claude Code
+hooks/                hook SessionStart: nạp tóm tắt kit vào đầu phiên
 bin/                  mỗi lệnh một file (+ ama.js gọi chung)
 src/                  args, config, credentials, errors, registry, root, run-layout, yaml, redact, ...
 src/clients/          chỗ duy nhất gọi API: jira, confluence, figma, browserstack, cloud-provider, webdriver

@@ -14,6 +14,7 @@ triggers:
 
 1. Credential chỉ đọc từ biến môi trường hoặc OS keychain (service `ama-kit`):
    `ATLASSIAN_SITE`, `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN`, `FIGMA_ACCESS_TOKEN`, `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY`.
+   Hoặc từ file `.env` ở gốc kit / `.ama/.env` của dự án, với điều kiện git bỏ qua file đó. `.env.example` chỉ chứa tên biến.
 2. Không bao giờ yêu cầu người dùng dán token vào chat. Nếu họ dán, đừng lặp lại giá trị đó; khuyên họ thu hồi token và tạo token mới.
 3. Không truyền token qua dòng lệnh. CLI từ chối `--token`, `--password`, `--api-token`, `--access-key`, `--secret` (mã thoát 2).
 4. Không ghi token vào repo, file config, log, báo cáo, comment hay prompt. `.env.example` chỉ chứa tên biến với giá trị rỗng.

@@ -24,6 +24,8 @@ Schema: `${CLAUDE_PLUGIN_ROOT}/knowledge/qe-workflow.md`.
 1. **Lấy dữ liệu.** `node "${CLAUDE_PLUGIN_ROOT}/bin/analyze-requirement.js" <KEY>`. Lệnh tạo `runs/<KEY>-<thời điểm>/`
    với `jira/issue.md`, `confluence/*.md`, `figma/*.png`, `manifest.json` và in đường dẫn. Đọc cảnh báo:
    thiếu AC, frame không có node-id, page không lấy được đều đáng một dòng trong báo cáo.
+   Nếu lệnh báo "Nguồn không đổi … đã chép report/" thì phân tích cũ vẫn đúng: chỉ cần kiểm bằng `qe-workflow` và báo
+   lại, không viết lại (trừ khi người dùng muốn; khi đó chạy lại với `--fresh`).
 
 2. **Đọc hết nguồn.** `jira/issue.md`, mọi file `confluence/`, và **nhìn** từng PNG trong `figma/` bằng công cụ Read
    (`manifest.json` cho biết PNG nào là frame nào).

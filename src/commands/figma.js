@@ -13,6 +13,9 @@ Cách dùng
   figma export --url <link Figma có node-id> [--url ...] [--out <thư mục>]
   figma export --file <FILE_KEY> --nodes 12:34,56:78 [--out <thư mục>]
 
+Link tới một page hoặc section (vd. page "3.3 Quản lý đơn hàng") được mở rộng thành các màn hình
+bên trong (frame, component), tối đa limits.maxFrames.
+
 Ảnh được cache theo version file; --force để tải lại. Báo cáo và manifest chỉ ghi link figma.com,
 không ghi URL ảnh ký sẵn (có chữ ký) và không ghi token.
 
@@ -67,10 +70,10 @@ export async function run(argv) {
 
   let failed = 0;
   for (const [fk, nodes] of byFile) {
-    const res = await exportFrames(fk, nodes, out, { scale: Number(flags.scale || 2), force: flags.force });
+    const res = await exportFrames(fk, nodes, out, { scale: Number(flags.scale || 2), force: flags.force, maxFrames: project.config.limits.maxFrames });
     for (const f of res.frames) console.log(`${f.nodeId}\t${f.name}\t${f.file}`);
     for (const w of res.warnings) console.error(`cảnh báo: ${w}`);
-    failed += nodes.length - res.frames.length;
+    if (!res.frames.length) failed++;
   }
   return failed ? 1 : 0;
 }

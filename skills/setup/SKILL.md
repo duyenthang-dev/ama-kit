@@ -27,6 +27,7 @@ CLI của kit nằm ở `${CLAUDE_PLUGIN_ROOT}/bin/`. Chạy lệnh bằng `node
    | `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY` | BrowserStack → Account → Access key (chỉ cần khi chạy mobile) |
 
    Họ tự đặt bằng một trong hai cách, trong terminal của họ:
+   - file `.env`: chép `${CLAUDE_PLUGIN_ROOT}/.env.example` thành `~/.ama/.env` (hoặc `.ama/.env` của dự án) rồi người dùng tự điền. File phải nằm trong `.gitignore`, nếu không kit bỏ qua token trong đó. Không bao giờ điền giá trị vào `.env.example`;
    - thêm `export TÊN_BIẾN=...` vào shell profile (`~/.zshrc`), mở terminal mới rồi mở lại Claude Code;
    - macOS Keychain: `security add-generic-password -s ama-kit -a FIGMA_ACCESS_TOKEN -w` (lệnh sẽ hỏi giá trị).
      Linux: `secret-tool store --label=ama-kit service ama-kit account FIGMA_ACCESS_TOKEN`.
